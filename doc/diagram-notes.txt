@@ -146,10 +146,13 @@ are read from disk. Exports use render.scale, render.shape_fills, and
 render.timeout_ms for each rendering step. The live preview keeps its own
 images and theme.
 
-PDFs use Vellum's A4 layout with embedded images. Export runs asynchronously
-and reports the completed path or a failure. Temporary assets are cleaned up
-when the export finishes. Run :Vellum build to install its browser renderer
-and :checkhealth vellum to diagnose browser setup.
+PDFs use Vellum's A4 layout with embedded images. Text uses the locally installed
+JetBrainsMono Nerd Font Mono in Medium weight, falling back to JetBrains Mono
+or monospace. Headings, tables, and code use the same font family.
+
+Export runs asynchronously and reports the completed path or a failure.
+Temporary assets are cleaned up when the export finishes. Run :Vellum build
+to install its browser renderer and :checkhealth vellum to diagnose browser setup.
 
 TROUBLESHOOTING                                      *diagram-notes-troubleshooting*
 

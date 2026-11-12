@@ -34,7 +34,7 @@ local ok, err = xpcall(function()
 	local lines = {
 		"# Diagram notes PDF export",
 		"",
-		"This note combines conversation context, a diagram, a table, and code.",
+		"This note combines **conversation context**, a diagram, a table, and *code*.",
 		"",
 		"## Architecture",
 		"",
