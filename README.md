@@ -36,6 +36,10 @@ With lazy.nvim, using a local checkout:
 | `:DiagramZoom` | Inspect the selected diagram full-screen |
 | `:ExcalidrawRender` | Regenerate the note's PNGs |
 
+In the Snacks picker, press `<C-x>` to delete the highlighted note and its matching
+`.assets/` directory. With the fallback picker, choose **Delete note…**, then the
+note. Deletion is immediate; unsaved edits in the note or its assets block deletion.
+
 ## Agent skill
 
 Link or copy [`skills/diagrams`](skills/diagrams) into your agent's skills directory.
