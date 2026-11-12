@@ -161,9 +161,9 @@ function M.open()
 				},
 				win = {
 					input = {
-						keys = { ["<C-x>"] = { "delete_note", mode = { "n", "i" }, desc = "Delete note and assets" } },
+						keys = { d = { "delete_note", mode = "n", desc = "Delete note and assets" } },
 					},
-					list = { keys = { ["<C-x>"] = { "delete_note", desc = "Delete note and assets" } } },
+					list = { keys = { d = { "delete_note", mode = "n", desc = "Delete note and assets" } } },
 				},
 			})
 		elseif options.picker == "snacks" then

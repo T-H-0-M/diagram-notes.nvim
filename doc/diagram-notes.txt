@@ -62,7 +62,8 @@ picker="auto" uses Snacks when installed. The Snacks picker has file previews;
 the vim.ui.select fallback lists Markdown paths without its own preview pane.
 Selection opens a vertical split beside the window that launched the picker.
 
-In Snacks, <C-x> deletes the highlighted note from the input or result list.
+In Snacks, d in normal mode deletes the highlighted note from the input or
+result list. Press <Esc> first when editing the search input.
 The fallback picker provides a "Delete note…" entry, followed by note selection.
 Deletion immediately removes the Markdown file and its matching sibling
 <note-stem>.assets/ directory. Linked files elsewhere are retained. Unsaved

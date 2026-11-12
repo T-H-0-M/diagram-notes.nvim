@@ -94,9 +94,10 @@ test("Snacks discovery enables file previews and vertical split confirmation", f
 	h.equal("file", selected.preview)
 	h.equal(true, selected.layout.preview)
 	h.equal({ action = "jump", cmd = "vsplit" }, selected.confirm)
-	h.equal("delete_note", selected.win.input.keys["<C-x>"][1])
-	h.equal({ "n", "i" }, selected.win.input.keys["<C-x>"].mode)
-	h.equal("delete_note", selected.win.list.keys["<C-x>"][1])
+	h.equal("delete_note", selected.win.input.keys.d[1])
+	h.equal("n", selected.win.input.keys.d.mode)
+	h.equal("delete_note", selected.win.list.keys.d[1])
+	h.equal("n", selected.win.list.keys.d.mode)
 	h.equal(nil, ctx.items)
 end)
 
