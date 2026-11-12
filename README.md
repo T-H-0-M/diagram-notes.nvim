@@ -60,3 +60,11 @@ a notes directory; otherwise both use `$TMPDIR/diagram-notes` (system temp fallb
 
 See `:help diagram-notes` for configuration, controls, and development checks.
 Run `:checkhealth diagram_notes` to diagnose setup problems.
+
+## Credits
+
+- [Vellum](https://github.com/blackhat-7/vellum.nvim) by
+  [blackhat-7](https://github.com/blackhat-7) powers Markdown previews, image viewing,
+  and PDF export.
+- [Excalidraw](https://github.com/excalidraw/excalidraw) provides the diagram editor
+  and editable scene format used by these notes.

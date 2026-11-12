@@ -23,6 +23,23 @@ description: >
 
 - Default to Excalidraw, including structured diagrams. Use Mermaid only when
   the user explicitly requests it.
+- A user-specified reference note takes precedence over the style defaults below.
+  Copy typography, stroke colours and widths, roughness, opacity, fills, and
+  corner settings from its actual scene elements, matching element roles.
+  Preserve meaningful dashed relationships. Compare the rendered results;
+  do not approximate the reference by changing only selected style properties.
+- Use the hand-drawn style by default: Excalifont (`fontFamily: 5`) for every
+  text element, `roughness: 1` and `strokeWidth: 2` for visible shapes and
+  connectors. Start labels at `fontSize: 20`, adjusting size and wrapping to fit.
+  Use solid strokes unless dashed strokes convey a relationship. Only use
+  another visual style when the user explicitly requests it.
+- Round corners by default: set rectangles' `roundness` to `{ "type": 3 }`
+  and diamonds' to `{ "type": 2 }`. Set `appState.currentItemRoundness` to
+  `"round"` for continued editing. Keep rounded connectors where supported.
+- Apply these settings to the actual elements, including imported/generated
+  scenes; `appState.currentItem*` settings affect only newly drawn elements.
+  A handwritten font alone does not make outlines hand-drawn. Preserve semantic
+  colours, connector styles, layout, and IDs when normalising an existing scene.
 - Establish the relationships from the conversation and relevant source files.
   Label assumptions and distinguish current behavior from proposals.
 - Focus each drawing on one question. Use concise labels, consistent reading
@@ -55,6 +72,9 @@ The API validates the request before sending it to the worker.
 - `--transparent` removes only the canvas; element fills must also be transparent.
   Let the dark export theme adapt scene colours.
 - Read the note back, check scene/image links, render, and inspect the result.
+  Verify typography, outlines, corner settings, text fit, and transparency
+  against the chosen style. When matching another note, inspect its scene settings
+  and rendered image rather than guessing a font or relying on renderer defaults.
   Fix errors before handing off; report any rendering check you could not perform.
   For requested Mermaid, validate its fenced blocks and syntax instead.
 - Return the absolute note path and a ready-to-paste `:vsplit <absolute-path>`
