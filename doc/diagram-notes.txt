@@ -147,7 +147,7 @@ render.timeout_ms for each rendering step. The live preview keeps its own
 images and theme.
 
 PDFs use Vellum's A4 layout with embedded images. Text, headings, and tables use
-the locally installed Source Serif 4, falling back to Georgia or serif. Code
+the locally installed Inter, falling back to Arial or sans-serif. Code
 uses JetBrainsMono Nerd Font Mono in Medium weight, falling back to JetBrains
 Mono or monospace. Install both font families for the intended appearance.
 

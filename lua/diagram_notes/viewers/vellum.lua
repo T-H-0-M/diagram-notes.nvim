@@ -52,7 +52,7 @@ function M.export(markdown, directory, output, done)
 	end
 	markdown = [[<style>
 body {
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: "Inter", Arial, sans-serif;
   font-weight: 400;
 }
 code, pre {
