@@ -1,0 +1,151 @@
+*diagram-notes.txt*  Live diagram notes beside your code
+
+CONTENTS                                             *diagram-notes*
+
+    Setup               |diagram-notes-setup|
+    Configuration       |diagram-notes-config|
+    Usage and files     |diagram-notes-usage|
+    Troubleshooting     |diagram-notes-troubleshooting|
+    Development         |diagram-notes-development|
+
+SETUP                                                *diagram-notes-setup*
+
+Requires Neovim 0.12+, vellum.nvim, markdown and markdown_inline Tree-sitter
+parsers, and a Kitty-graphics terminal such as Ghostty or Kitty. Enable
+'termguicolors'. Neovim's standard 0.12 distribution includes the Markdown
+parsers; custom builds may require installing them separately.
+
+For tmux, enable allow-passthrough and true-colour terminal features. For
+Ghostty, for example: >
+    set -g allow-passthrough on
+    set -as terminal-features ',xterm-ghostty:RGB'
+<
+Install vellum.nvim through your plugin manager. Lazy runs Vellum's build;
+other managers should run :Vellum build for its optional browser rendering.
+
+The Excalidraw CLI uses Node.js 22+ and an installed Chrome, Chromium, Edge,
+or Firefox. Set EXCALIDRAW_BROWSER_PATH for a custom browser executable.
+The default launcher uses excalidraw from PATH, falling back to:
+    npx --yes --package=@excalidraw/cli@0.3.0 excalidraw
+The first npx invocation downloads the package. Rendering is local.
+
+Call setup, or use the commands with defaults: >lua
+    require("diagram_notes").setup({})
+<
+No leader mappings are installed. Configure your own mappings or use the
+lazy.nvim example in the README. Repeating setup replaces configuration and
+closes an active preview before reinstalling its lifecycle handlers.
+
+CONFIGURATION                                        *diagram-notes-config*
+
+Defaults: >lua
+    require("diagram_notes").setup({
+      -- notes_dir = "/absolute/path",  -- overrides DIAGRAM_NOTES_DIR
+      picker = "auto",                 -- auto, snacks, select
+      debounce_ms = 200,
+      render = {
+        -- command = { "excalidraw" }, -- argument list, never a shell string
+        scale = 2,
+        timeout_ms = 120000,
+        theme = "dark",                -- dark or light
+        transparent = true,
+        shape_fills = "transparent",   -- transparent or preserve
+      },
+    })
+<
+notes_dir resolves in this order: setup option, DIAGRAM_NOTES_DIR environment
+variable, then TMPDIR/diagram-notes (system temporary directory if TMPDIR is
+unset). Use DIAGRAM_NOTES_DIR for shared agent/editor configuration; if you
+override notes_dir only inside Neovim, give the agent the same destination.
+
+picker="auto" uses Snacks when installed. The Snacks picker has file previews;
+the vim.ui.select fallback lists Markdown paths without its own preview pane.
+Selection opens a vertical split beside the window that launched the picker.
+
+shape_fills="transparent" clears element backgroundColor values in the render
+input, preserving the editable scene file. It does not alter embedded raster
+images. transparent controls the canvas; false enables the scene's canvas
+background colour. After changing export settings, force regeneration with
+:ExcalidrawRender because existing PNG timestamps may still be up to date.
+
+USAGE AND FILES                                      *diagram-notes-usage*
+
+    :DiagramNotes       Browse Markdown notes across projects.
+    :DiagramPreview     Toggle the current note's source/preview.
+    :DiagramZoom        Inspect the diagram under the preview cursor.
+    :ExcalidrawRender   Force exports for the current preview's scene links.
+
+Lua API: require("diagram_notes").setup(opts), notes(), toggle(), zoom(),
+render(), and close(). Commands initialize defaults if setup has not run.
+
+In the preview, q returns to source. In the full-screen viewer, +/- zoom,
+hjkl or arrows pan, 0 fits, and q or Escape closes the viewer.
+
+One managed document is previewed at a time. Entering another Markdown
+document restores the previous source. Adjacent code windows retain their
+layout and focus during file updates. Unsaved Markdown edits are preserved;
+conflicting disk changes produce a notification. Image-only changes can still
+refresh while the Markdown source is modified.
+
+Recommended layout:
+    <notes-dir>/<project>/<topic>-<short-id>.md
+    <notes-dir>/<project>/<topic>-<short-id>.assets/overview.excalidraw
+    <notes-dir>/<project>/<topic>-<short-id>.assets/overview.png
+
+Use relative links in Markdown: >
+    ![Overview](architecture-a1b2.assets/overview.png)
+
+    [Drawing source](architecture-a1b2.assets/overview.excalidraw)
+<
+Missing or stale PNGs export when the preview opens. Directory watchers detect
+atomic replacements and asset changes. Exports are debounced, obsolete results
+are discarded, and successful images are published by atomic rename. Failed
+exports retain the last good PNG; :ExcalidrawRender retries them.
+
+Existing notes can live anywhere when opened directly. DiagramNotes searches
+only the configured notes directory. Move the Markdown and its assets together
+when retaining a note elsewhere. The plugin does not expire stored notes.
+
+The companion skill at skills/diagrams is agent-agnostic. Link or copy that
+directory into the skills location supported by your agent. It uses Excalidraw
+by default, transparent shapes, dark-theme exports, stable paths, and concise
+context. Mermaid is used only when explicitly requested.
+
+TROUBLESHOOTING                                      *diagram-notes-troubleshooting*
+
+Run :checkhealth diagram_notes and :checkhealth vellum. If an image is missing,
+check renderer notifications, the linked paths, Node/browser availability,
+terminal graphics support, and tmux passthrough. Retry with :ExcalidrawRender.
+For existing opaque images, regenerate after restarting Neovim with the new
+settings. CLI --transparent alone removes the canvas, not shape fills.
+
+DEVELOPMENT                                          *diagram-notes-development*
+
+Run from the repository root: >
+    make deps
+    make test
+    make check
+<
+Dependencies are stored in ignored .deps/. The Makefile pins the tested Vellum
+revision. Tests use --clean and do not depend on a personal Neovim setup.
+Override NVIM or VELLUM_PATH to test another installation. Unit/integration
+checks do not require a browser or a graphics terminal.
+
+For a real render smoke test (requires the CLI prerequisites): >
+    make smoke
+<
+For the interactive smoke test, run from an actual Ghostty/Kitty terminal
+(inside tmux when checking passthrough): >
+    nvim --clean -c 'lua dofile("tests/terminal_smoke.lua")'
+<
+Set VELLUM_PATH to use another checkout. Also set SNACKS_PATH to a Snacks
+checkout to exercise the real picker with file previews and split selection.
+The smoke scripts write their output under ignored .deps/; the terminal
+result is .deps/terminal-result.txt. The PNG check uses Python 3's standard
+library to verify canvas/shape transparency and light foreground pixels.
+
+The rendering implementation lives in lua/diagram_notes/excalidraw.lua; preview
+lifecycle in preview.lua; picker selection in notes.lua. Viewer internals are
+isolated in viewers/vellum.lua. Recheck that adapter when upgrading Vellum.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
