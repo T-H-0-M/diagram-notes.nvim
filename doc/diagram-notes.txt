@@ -5,6 +5,7 @@ CONTENTS                                             *diagram-notes*
     Setup               |diagram-notes-setup|
     Configuration       |diagram-notes-config|
     Usage and files     |diagram-notes-usage|
+    PDF export          |diagram-notes-export|
     Troubleshooting     |diagram-notes-troubleshooting|
     Development         |diagram-notes-development|
 
@@ -21,7 +22,7 @@ Ghostty, for example: >
     set -as terminal-features ',xterm-ghostty:RGB'
 <
 Install vellum.nvim through your plugin manager. Lazy runs Vellum's build;
-other managers should run :Vellum build for its optional browser rendering.
+other managers should run :Vellum build for PDF export and browser rendering.
 
 The Excalidraw CLI uses Node.js 22+ and an installed Chrome, Chromium, Edge,
 or Firefox. Set EXCALIDRAW_BROWSER_PATH for a custom browser executable.
@@ -32,9 +33,9 @@ The first npx invocation downloads the package. Rendering is local.
 Call setup, or use the commands with defaults: >lua
     require("diagram_notes").setup({})
 <
-No leader mappings are installed. Configure your own mappings or use the
-lazy.nvim example in the README. Repeating setup replaces configuration and
-closes an active preview before reinstalling its lifecycle handlers.
+<leader>ex exports the current note to PDF. Configure other mappings yourself
+or use the lazy.nvim example in the README. Repeating setup replaces
+configuration and closes an active preview before reinstalling its handlers.
 
 CONFIGURATION                                        *diagram-notes-config*
 
@@ -71,6 +72,8 @@ buffers for the note or its assets block deletion. An active preview of the
 deleted note closes and cancels its exports; saved buffers for deleted files
 are cleared. The picker refreshes after deletion, preserving the Snacks query.
 If deletion fails partway through, a notification reports what remains.
+In Snacks, e in normal mode exports the highlighted note to PDF. The fallback
+picker has an "Export note…" entry. See |diagram-notes-export|.
 
 shape_fills="transparent" clears element backgroundColor values in the render
 input, preserving the editable scene file. It does not alter embedded raster
@@ -84,9 +87,11 @@ USAGE AND FILES                                      *diagram-notes-usage*
     :DiagramPreview     Toggle the current note's source/preview.
     :DiagramZoom        Inspect the diagram under the preview cursor.
     :ExcalidrawRender   Force exports for the current preview's scene links.
+    :DiagramExport [path.pdf]   Export the source or previewed note to PDF.
 
 Lua API: require("diagram_notes").setup(opts), notes(), toggle(), zoom(),
-render(), and close(). Commands initialize defaults if setup has not run.
+render(), export(path), and close(). Commands initialize defaults if setup
+has not run.
 
 In the preview, q returns to source. In the full-screen viewer, +/- zoom,
 hjkl or arrows pan, 0 fits, and q or Escape closes the viewer.
@@ -121,6 +126,31 @@ directory into the skills location supported by your agent. It uses Excalidraw
 by default, transparent shapes, dark-theme exports, stable paths, and concise
 context. Mermaid is used only when explicitly requested.
 
+PDF EXPORT                                           *diagram-notes-export*
+
+<leader>ex runs :DiagramExport in normal mode, from source or preview. By
+default it writes ~/Downloads/<note-stem>.pdf, creating Downloads if needed.
+An unnamed Markdown buffer exports to ~/Downloads/untitled.pdf. To choose a
+different destination: >
+    :DiagramExport ~/Downloads/architecture.pdf
+<
+Relative destinations resolve against Neovim's working directory. Escape
+spaces in command arguments with a backslash. An existing PDF is replaced
+only after the new export succeeds.
+
+Export snapshots the current Markdown buffer, including unsaved edits. Picker
+exports use a loaded buffer when available, otherwise the saved file. Local
+Markdown image links are copied into an export workspace; matching Excalidraw
+scenes are rendered there in the light theme for white PDF pages. Scene files
+are read from disk. Exports use render.scale, render.shape_fills, and
+render.timeout_ms for each rendering step. The live preview keeps its own
+images and theme.
+
+PDFs use Vellum's A4 layout with embedded images. Export runs asynchronously
+and reports the completed path or a failure. Temporary assets are cleaned up
+when the export finishes. Run :Vellum build to install its browser renderer
+and :checkhealth vellum to diagnose browser setup.
+
 TROUBLESHOOTING                                      *diagram-notes-troubleshooting*
 
 Run :checkhealth diagram_notes and :checkhealth vellum. If an image is missing,
@@ -144,7 +174,13 @@ checks do not require a browser or a graphics terminal.
 For a real render smoke test (requires the CLI prerequisites): >
     make smoke
 <
-For the interactive smoke test, run from an actual Ghostty/Kitty terminal
+For a real PDF export smoke test (also requires :Vellum build): >
+    make smoke-pdf
+<
+The PDF path is recorded in .deps/pdf-result.txt. Inspect its diagrams, text,
+and page breaks after changing PDF export behaviour.
+
+For the interactive smoke test, build Vellum's renderer and run from Ghostty/Kitty
 (inside tmux when checking passthrough): >
     nvim --clean -c 'lua dofile("tests/terminal_smoke.lua")'
 <

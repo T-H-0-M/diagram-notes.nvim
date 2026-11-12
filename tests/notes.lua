@@ -7,6 +7,7 @@ local config = require("diagram_notes.config")
 local select, notify = vim.ui.select, vim.notify
 local loaded, preload = package.loaded.snacks, package.preload.snacks
 local delete, unlink = vim.fn.delete, vim.uv.fs_unlink
+local exporter = package.loaded["diagram_notes.export"]
 
 local function test(name, body)
 	local directory = vim.fn.tempname()
@@ -44,6 +45,7 @@ local function test(name, body)
 		vim.ui.select, vim.notify = select, notify
 		vim.fn.delete, vim.uv.fs_unlink = delete, unlink
 		package.loaded.snacks, package.preload.snacks = loaded, preload
+		package.loaded["diagram_notes.export"] = exporter
 		vim.cmd("silent! only!")
 		vim.cmd("enew!")
 		for _, buf in ipairs(vim.api.nvim_list_bufs()) do
@@ -57,10 +59,11 @@ end
 
 test("auto discovery falls back to Markdown-only selection without Snacks", function(ctx)
 	notes.open()
-	h.equal(2, #ctx.items)
+	h.equal(3, #ctx.items)
 	h.equal(ctx.note, ctx.items[1])
 	h.equal("project/note with spaces.md", ctx.options.format_item(ctx.note))
-	h.equal("Delete note…", ctx.options.format_item(ctx.items[2]))
+	h.equal("Export note…", ctx.options.format_item(ctx.items[2]))
+	h.equal("Delete note…", ctx.options.format_item(ctx.items[3]))
 end)
 
 test("fallback selection opens a split beside the original unsaved code buffer", function(ctx)
@@ -98,6 +101,9 @@ test("Snacks discovery enables file previews and vertical split confirmation", f
 	h.equal("n", selected.win.input.keys.d.mode)
 	h.equal("delete_note", selected.win.list.keys.d[1])
 	h.equal("n", selected.win.list.keys.d.mode)
+	h.equal("export_note", selected.win.input.keys.e[1])
+	h.equal("n", selected.win.input.keys.e.mode)
+	h.equal("export_note", selected.win.list.keys.e[1])
 	h.equal(nil, ctx.items)
 end)
 
@@ -206,7 +212,7 @@ test("fallback deletion refreshes the original picker from disk", function(ctx)
 	ctx.choose(ctx.note)
 	h.equal("Diagram notes", ctx.options.prompt)
 	h.equal(remaining, ctx.items[1])
-	h.equal(2, #ctx.items)
+	h.equal(3, #ctx.items)
 	h.equal(nil, vim.uv.fs_stat(ctx.assets))
 	h.equal(ctx.win, vim.api.nvim_get_current_win())
 end)
@@ -280,6 +286,47 @@ test("a missing notes directory explains where new notes should go", function(ct
 	notes.open()
 	h.equal(nil, ctx.items)
 	assert(ctx.notices[1]:find(ctx.directory .. "/missing", 1, true))
+end)
+
+test("fallback export passes the selected note to the PDF exporter", function(ctx)
+	local exported
+	package.loaded["diagram_notes.export"] = {
+		file = function(path)
+			exported = path
+		end,
+	}
+	notes.open()
+	ctx.choose(ctx.items[#ctx.items - 1])
+	h.equal("Export note to PDF", ctx.options.prompt)
+	ctx.choose(ctx.note)
+	h.equal(ctx.note, exported)
+	h.equal("Diagram notes", ctx.options.prompt)
+	h.equal(ctx.win, vim.api.nvim_get_current_win())
+end)
+
+test("Snacks export resolves the highlighted note without closing the picker", function(ctx)
+	local options, exported
+	package.loaded["diagram_notes.export"] = {
+		file = function(path)
+			exported = path
+		end,
+	}
+	package.loaded.snacks = {
+		picker = {
+			pick = function(opts)
+				options = opts
+			end,
+			util = {
+				path = function(item)
+					return item.cwd .. "/" .. item.file
+				end,
+			},
+		},
+	}
+	notes.open()
+	options.actions.export_note({}, { cwd = ctx.directory, file = "project/note with spaces.md" })
+	h.equal(ctx.note, exported)
+	h.equal(ctx.win, vim.api.nvim_get_current_win())
 end)
 
 h.finish()
