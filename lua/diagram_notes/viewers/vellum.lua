@@ -52,10 +52,13 @@ function M.export(markdown, directory, output, done)
 	end
 	markdown = [[<style>
 body {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-weight: 400;
+}
+code, pre {
   font-family: "JetBrainsMono Nerd Font Mono", "JetBrains Mono", monospace;
   font-weight: 500;
 }
-code, pre { font-family: inherit; font-weight: inherit; }
 @media print {
   h1, h2, h3, h4, h5, h6 { break-after: avoid; }
   img { max-height: 240mm; width: auto; height: auto; }
