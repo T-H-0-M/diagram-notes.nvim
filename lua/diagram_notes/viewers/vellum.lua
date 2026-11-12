@@ -60,6 +60,8 @@ code, pre {
   font-weight: 500;
 }
 @media print {
+  article { padding-top: 0; }
+  article > h1:first-of-type { margin-top: 0; }
   h1, h2, h3, h4, h5, h6 { break-after: avoid; }
   img { max-height: 240mm; width: auto; height: auto; }
 }
