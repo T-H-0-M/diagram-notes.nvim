@@ -18,44 +18,21 @@ end
 function M.references(buf)
 	local scenes, images = {}, {}
 	local directory = vim.fs.dirname(api.nvim_buf_get_name(buf)) or vim.fn.getcwd()
-	local function add(destination)
-		destination = destination:match("^<(.*)>$") or destination
-		if destination:match("^%a[%w+.-]*:") or destination:match("^//") then
-			return
-		end
-		destination = vim.uri_decode(destination:match("^[^#?]*")):gsub("\\([%p])", "%1")
-		local path = vim.fs.normalize(destination:sub(1, 1) == "/" and destination or directory .. "/" .. destination)
-		if path:match("%.excalidraw$") then
+	local links = require("diagram_notes.links")
+	for _, item in ipairs(links.destinations(buf)) do
+		local path = links.path(item.destination, directory)
+		if path and path:match("%.excalidraw$") then
 			local png = path:gsub("%.excalidraw$", ".png")
 			scenes[path], images[png] = png, true
-		elseif path:match("%.png$") then
+		elseif path and path:match("%.png$") then
 			images[path] = true
 			scenes[path:gsub("%.png$", ".excalidraw")] = path
-		end
-	end
-
-	local parser = vim.treesitter.get_parser(buf, "markdown")
-	local blocks = vim.treesitter.query.parse(
-		"markdown",
-		"[(link_reference_definition (link_destination) @path) (inline) @inline]"
-	)
-	local links = vim.treesitter.query.parse("markdown_inline", "(link_destination) @path")
-	for id, node in blocks:iter_captures(parser:parse()[1]:root(), buf) do
-		local text = vim.treesitter.get_node_text(node, buf)
-		if blocks.captures[id] == "path" then
-			add(text)
-		else
-			-- Parse only prose inlines, so examples inside code fences never trigger exports.
-			local inline = vim.treesitter.get_string_parser(text, "markdown_inline"):parse()[1]
-			for _, link in links:iter_captures(inline:root(), text) do
-				add(vim.treesitter.get_node_text(link, text))
-			end
 		end
 	end
 	return scenes, images
 end
 
-local function render_input(path, options)
+function M.prepare(path, options)
 	local scene = vim.json.decode(table.concat(vim.fn.readfile(path), "\n"))
 	assert(type(scene) == "table" and type(scene.elements) == "table", "Scene must contain an elements array")
 	if options.shape_fills == "transparent" then
@@ -71,7 +48,7 @@ local function render_input(path, options)
 end
 
 local function command(output, options)
-	local cmd = vim.list_extend(config.command(), {
+	local cmd = vim.list_extend(vim.deepcopy(options.command or config.command()), {
 		"render",
 		"-",
 		"--out",
@@ -97,6 +74,35 @@ local function png(path)
 	local header = file:read(24)
 	file:close()
 	return header and #header == 24 and header:sub(1, 8) == "\137PNG\r\n\26\n"
+end
+
+function M.render(input, output, options, done)
+	local ok, process = pcall(
+		vim.system,
+		command(output, options),
+		{
+			stdin = input,
+			text = true,
+			timeout = options.timeout_ms,
+			env = { EXCALIDRAW_NO_UPDATE_NOTIFIER = "1" },
+		},
+		vim.schedule_wrap(function(result)
+			local err
+			if result.code ~= 0 then
+				err = vim.trim(result.stderr or "")
+				if err == "" then
+					err = "renderer exited with code " .. result.code
+				end
+			elseif not png(output) then
+				err = "renderer did not produce a PNG"
+			end
+			done(err)
+		end)
+	)
+	if not ok then
+		return nil, "Could not start Excalidraw (requires Node.js 22+ and npm): " .. tostring(process)
+	end
+	return process
 end
 
 local function stop(entry)
@@ -161,7 +167,7 @@ function M.watch(buf, on_image)
 	end
 
 	local function render(scene, entry, version)
-		local prepared, input = pcall(render_input, scene, options.render)
+		local prepared, input = pcall(M.prepare, scene, options.render)
 		if not prepared then
 			entry.failed = version
 			return warn("Could not prepare " .. scene .. ": " .. tostring(input))
@@ -173,54 +179,36 @@ function M.watch(buf, on_image)
 		end
 		uv.fs_close(fd)
 		entry.temporary = temporary
-		local ok, process = pcall(
-			vim.system,
-			command(temporary, options.render),
-			{
-				stdin = input,
-				text = true,
-				timeout = options.render.timeout_ms,
-				env = { EXCALIDRAW_NO_UPDATE_NOTIFIER = "1" },
-			},
-			vim.schedule_wrap(function(result)
-				entry.process, entry.temporary = nil, nil
-				if self.closed or self.entries[scene] ~= entry then
-					uv.fs_unlink(temporary)
-					return
-				end
-				if not vim.deep_equal(version, signature(scene)) then
-					uv.fs_unlink(temporary)
-					return self:refresh()
-				end
-				local err
-				if result.code ~= 0 then
-					err = vim.trim(result.stderr or "")
-					if err == "" then
-						err = "renderer exited with code " .. result.code
-					end
-				elseif not png(temporary) then
-					err = "renderer did not produce a PNG"
-				else
-					local renamed
-					renamed, err = uv.fs_rename(temporary, entry.output)
-					if renamed then
-						entry.rendered, entry.failed = version, nil
-					end
-				end
-				if err then
-					entry.failed = version
-					warn("Export failed for " .. scene .. ": " .. err:sub(-2000))
-				end
+		local process, problem = M.render(input, temporary, options.render, function(err)
+			entry.process, entry.temporary = nil, nil
+			if self.closed or self.entries[scene] ~= entry then
 				uv.fs_unlink(temporary)
-				self:refresh()
-			end)
-		)
-		if ok then
+				return
+			end
+			if not vim.deep_equal(version, signature(scene)) then
+				uv.fs_unlink(temporary)
+				return self:refresh()
+			end
+			if not err then
+				local renamed
+				renamed, err = uv.fs_rename(temporary, entry.output)
+				if renamed then
+					entry.rendered, entry.failed = version, nil
+				end
+			end
+			if err then
+				entry.failed = version
+				warn("Export failed for " .. scene .. ": " .. err:sub(-2000))
+			end
+			uv.fs_unlink(temporary)
+			self:refresh()
+		end)
+		if process then
 			entry.process = process
 		else
 			entry.failed, entry.temporary = version, nil
 			uv.fs_unlink(temporary)
-			warn("Could not start Excalidraw (requires Node.js 22+ and npm): " .. tostring(process))
+			warn(problem)
 		end
 	end
 

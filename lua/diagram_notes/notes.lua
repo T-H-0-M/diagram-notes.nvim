@@ -97,7 +97,7 @@ function M.delete(path)
 	return true
 end
 
-local function select_note(directory, win, deleting)
+local function select_note(directory, win, action)
 	local files = vim.fs.find(function(name)
 		return name:match("%.md$") ~= nil
 	end, { path = directory, type = "file", limit = math.huge })
@@ -105,24 +105,37 @@ local function select_note(directory, win, deleting)
 	if #files == 0 then
 		return vim.notify("No diagram notes yet in " .. directory, vim.log.levels.INFO)
 	end
-	local delete_action = {}
-	if not deleting then
+	local delete_action, export_action = {}, {}
+	if not action then
+		files[#files + 1] = export_action
 		files[#files + 1] = delete_action
 	end
 	vim.ui.select(files, {
-		prompt = deleting and "Delete note and assets" or "Diagram notes",
+		prompt = action == "delete" and "Delete note and assets"
+			or (action == "export" and "Export note to PDF" or "Diagram notes"),
 		format_item = function(path)
-			return path == delete_action and "Delete note…" or (vim.fs.relpath(directory, path) or path)
+			if path == delete_action then
+				return "Delete note…"
+			elseif path == export_action then
+				return "Export note…"
+			end
+			return vim.fs.relpath(directory, path) or path
 		end,
 	}, function(path)
 		if path == delete_action then
-			select_note(directory, win, true)
-		elseif path and deleting then
-			M.delete(path)
+			select_note(directory, win, "delete")
+		elseif path == export_action then
+			select_note(directory, win, "export")
+		elseif path and action then
+			if action == "delete" then
+				M.delete(path)
+			else
+				require("diagram_notes.export").file(path)
+			end
 			if not api.nvim_win_is_valid(win) then
 				win = api.nvim_get_current_win()
 			end
-			select_note(directory, win, false)
+			select_note(directory, win)
 		elseif path and api.nvim_win_is_valid(win) then
 			api.nvim_set_current_win(win)
 			vim.cmd("vsplit " .. vim.fn.fnameescape(path))
@@ -152,6 +165,11 @@ function M.open()
 				layout = { preview = true },
 				confirm = { action = "jump", cmd = "vsplit" },
 				actions = {
+					export_note = function(_, item)
+						if item then
+							require("diagram_notes.export").file(snacks.picker.util.path(item))
+						end
+					end,
 					delete_note = function(picker, item)
 						if item then
 							M.delete(snacks.picker.util.path(item))
@@ -161,16 +179,24 @@ function M.open()
 				},
 				win = {
 					input = {
-						keys = { d = { "delete_note", mode = "n", desc = "Delete note and assets" } },
+						keys = {
+							d = { "delete_note", mode = "n", desc = "Delete note and assets" },
+							e = { "export_note", mode = "n", desc = "Export note to PDF" },
+						},
 					},
-					list = { keys = { d = { "delete_note", mode = "n", desc = "Delete note and assets" } } },
+					list = {
+						keys = {
+							d = { "delete_note", mode = "n", desc = "Delete note and assets" },
+							e = { "export_note", mode = "n", desc = "Export note to PDF" },
+						},
+					},
 				},
 			})
 		elseif options.picker == "snacks" then
 			return vim.notify("Install snacks.nvim or set picker = 'select'", vim.log.levels.ERROR)
 		end
 	end
-	select_note(directory, api.nvim_get_current_win(), false)
+	select_note(directory, api.nvim_get_current_win())
 end
 
 return M

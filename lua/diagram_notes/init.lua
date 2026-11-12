@@ -40,11 +40,20 @@ function M.close()
 	return require("diagram_notes.preview").close()
 end
 
+function M.export(path)
+	ensure_setup()
+	return require("diagram_notes.export").buffer(require("diagram_notes.preview").source(), path)
+end
+
 function M.commands()
 	vim.api.nvim_create_user_command("DiagramNotes", M.notes, { desc = "Browse diagram notes beside your code" })
 	vim.api.nvim_create_user_command("DiagramPreview", M.toggle, { desc = "Toggle diagram note source/preview" })
 	vim.api.nvim_create_user_command("DiagramZoom", M.zoom, { desc = "Inspect the selected diagram full-screen" })
 	vim.api.nvim_create_user_command("ExcalidrawRender", M.render, { desc = "Regenerate the note's Excalidraw images" })
+	vim.api.nvim_create_user_command("DiagramExport", function(opts)
+		M.export(opts.fargs[1])
+	end, { nargs = "?", complete = "file", desc = "Export the note to PDF (default: ~/Downloads)" })
+	vim.keymap.set("n", "<leader>ex", "<cmd>DiagramExport<cr>", { desc = "Export note to PDF" })
 end
 
 return M

@@ -281,6 +281,18 @@ test("failed exports preserve the last good image without automatic retry loops"
 	assert(ctx.notices[1]:find("Export failed", 1, true))
 end)
 
+test("a renderer launch error preserves the previous image", function(ctx)
+	ctx.write(ctx.output, image)
+	ctx.write(ctx.scene, scene("box"))
+	ctx.link()
+	vim.system = function()
+		error("not executable")
+	end
+	ctx.watch()
+	equal(image, read(ctx.output))
+	assert(ctx.notices[1]:find("Could not start Excalidraw", 1, true))
+end)
+
 test("a successful process with invalid image output preserves the last good PNG", function(ctx)
 	ctx.write(ctx.output, image)
 	ctx.write(ctx.scene, scene("box"))

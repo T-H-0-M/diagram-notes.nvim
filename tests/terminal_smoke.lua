@@ -7,6 +7,7 @@ end
 vim.o.termguicolors, vim.o.hidden = true, true
 local api = vim.api
 local results = {}
+local homedir = vim.uv.os_homedir
 local function pass(message)
 	results[#results + 1] = "PASS " .. message
 end
@@ -109,6 +110,21 @@ vim.defer_fn(function()
 		assert(read(output):sub(1, 8) == "\137PNG\r\n\26\n")
 		assert(api.nvim_win_get_width(code_win) == code_width)
 		pass("Real CLI export and inline terminal display")
+		vim.uv.os_homedir = function()
+			return directory
+		end
+		api.nvim_feedkeys(vim.keycode((vim.g.mapleader or "\\") .. "ex"), "x", false)
+		vim.uv.os_homedir = homedir
+		local pdf = directory .. "/Downloads/note.pdf"
+		assert(
+			vim.wait(120000, function()
+				return vim.uv.fs_stat(pdf) ~= nil
+			end, 20),
+			"Leader export did not publish a PDF in Downloads"
+		)
+		assert(read(pdf):sub(1, 5) == "%PDF-")
+		assert(api.nvim_get_current_win() == preview_win and api.nvim_win_get_width(code_win) == code_width)
+		pass("Leader PDF export from the preview defaults to Downloads and preserves focus")
 		api.nvim_win_set_cursor(preview_win, { row, 0 })
 		vim.cmd.DiagramZoom()
 		assert(api.nvim_win_get_config(0).relative == "editor")
@@ -162,6 +178,24 @@ vim.defer_fn(function()
 				"Note was not selected for deletion"
 			)
 			local focused = api.nvim_get_current_win()
+			local previous_pdf = assert(vim.uv.fs_stat(pdf)).ino
+			vim.uv.os_homedir = function()
+				return directory
+			end
+			local export_binding = api.nvim_win_call(picker.input.win.win, function()
+				return vim.fn.maparg("e", "n", false, true)
+			end)
+			assert(type(export_binding.callback) == "function", "Missing PDF export key")
+			export_binding.callback()
+			vim.uv.os_homedir = homedir
+			assert(
+				vim.wait(120000, function()
+					return vim.uv.fs_stat(pdf).ino ~= previous_pdf
+				end, 20),
+				"Picker export did not replace the PDF"
+			)
+			assert(api.nvim_get_current_win() == focused and picker.input:get() == "note")
+			pass("Snacks e exports the highlighted note while preserving picker query and focus")
 			local binding = api.nvim_win_call(picker.input.win.win, function()
 				assert(vim.tbl_isempty(vim.fn.maparg("d", "i", false, true)), "Deletion overrides search input")
 				return vim.fn.maparg("d", "n", false, true)
@@ -200,6 +234,7 @@ vim.defer_fn(function()
 	if not ok then
 		results[#results + 1] = "FAIL " .. err
 	end
+	vim.uv.os_homedir = homedir
 	plugin.close()
 	vim.fn.writefile(results, root .. "/.deps/terminal-result.txt")
 	if vim.env.DIAGRAM_NOTES_SMOKE_SIGNAL then

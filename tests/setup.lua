@@ -36,14 +36,14 @@ h.test("repeated setup replaces previous settings without duplicate lifecycle ha
 	h.equal(2, #vim.api.nvim_get_autocmds({ group = "DiagramNotesPreview" }))
 end, cleanup)
 
-h.test("setup registers commands without installing leader mappings", function()
-	local before = vim.api.nvim_get_keymap("n")
+h.test("setup registers commands and the PDF export leader mapping", function()
 	plugin.setup()
 	h.equal(2, vim.fn.exists(":DiagramNotes"))
 	h.equal(2, vim.fn.exists(":DiagramPreview"))
 	h.equal(2, vim.fn.exists(":DiagramZoom"))
 	h.equal(2, vim.fn.exists(":ExcalidrawRender"))
-	h.equal(before, vim.api.nvim_get_keymap("n"))
+	h.equal(2, vim.fn.exists(":DiagramExport"))
+	h.equal("<Cmd>DiagramExport<CR>", vim.fn.maparg("<leader>ex", "n"))
 end, cleanup)
 
 h.test("invalid configuration is rejected without replacing the working settings", function()

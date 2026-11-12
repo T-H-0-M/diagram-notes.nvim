@@ -97,6 +97,11 @@ function M.close_for(buf)
 	end
 end
 
+function M.source()
+	local buf = api.nvim_get_current_buf()
+	return active and buf == active.preview_buf and active.source or buf
+end
+
 function M.refresh(force)
 	local s = active
 	if not s or s.busy or not api.nvim_buf_is_valid(s.source) then

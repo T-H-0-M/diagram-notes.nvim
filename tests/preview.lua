@@ -15,6 +15,7 @@ local passed, failed = 0, 0
 local notify = vim.notify
 local system = vim.system
 local select = vim.ui.select
+local exporter = package.loaded["diagram_notes.export"]
 local notices = {}
 vim.notify = function(message)
 	notices[#notices + 1] = message
@@ -61,6 +62,7 @@ local function test(name, body)
 	preview.close()
 	vim.system = system
 	vim.ui.select = select
+	package.loaded["diagram_notes.export"] = exporter
 	require("diagram_notes.config").setup()
 	vim.cmd("silent! tabonly!")
 	vim.cmd("silent! only!")
@@ -297,6 +299,34 @@ test("the fallback picker can open another note after deleting its launching pre
 	choose(other)
 	equal(other, vim.api.nvim_buf_get_name(0))
 	equal(ctx.code_buf, vim.api.nvim_win_get_buf(ctx.code_win))
+end)
+
+test("the PDF command exports the source buffer to a custom path with spaces", function(ctx)
+	local selected, output
+	package.loaded["diagram_notes.export"] = {
+		buffer = function(buf, path)
+			selected, output = buf, path
+		end,
+	}
+	local path = vim.fs.dirname(ctx.file) .. "/shared note.pdf"
+	vim.cmd("DiagramExport " .. vim.fn.fnameescape(path))
+	equal(ctx.source, selected)
+	equal(path, output)
+end)
+
+test("the export leader mapping resolves the hidden source while previewing", function(ctx)
+	local selected
+	package.loaded["diagram_notes.export"] = {
+		buffer = function(buf)
+			selected = buf
+		end,
+	}
+	preview.toggle()
+	local win = vim.api.nvim_get_current_win()
+	vim.api.nvim_feedkeys(vim.keycode("<Space>ex"), "x", false)
+	equal(ctx.source, selected)
+	equal(win, vim.api.nvim_get_current_win())
+	equal("vellum://preview", vim.api.nvim_buf_get_name(0))
 end)
 
 vim.notify = notify

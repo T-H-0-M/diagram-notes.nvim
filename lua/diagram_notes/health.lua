@@ -24,6 +24,12 @@ function M.check()
 	else
 		health.ok("Vellum terminal graphics available")
 	end
+	local export_problem = require("diagram_notes.viewers.vellum").export_problem()
+	if export_problem then
+		health.warn(export_problem)
+	else
+		health.ok("Vellum PDF renderer installed")
+	end
 	local config = require("diagram_notes.config")
 	local executable = config.command()[1]
 	if vim.fn.executable(executable) == 1 then
