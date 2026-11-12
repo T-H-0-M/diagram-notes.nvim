@@ -62,6 +62,16 @@ picker="auto" uses Snacks when installed. The Snacks picker has file previews;
 the vim.ui.select fallback lists Markdown paths without its own preview pane.
 Selection opens a vertical split beside the window that launched the picker.
 
+In Snacks, d in normal mode deletes the highlighted note from the input or
+result list. Press <Esc> first when editing the search input.
+The fallback picker provides a "Delete note…" entry, followed by note selection.
+Deletion immediately removes the Markdown file and its matching sibling
+<note-stem>.assets/ directory. Linked files elsewhere are retained. Unsaved
+buffers for the note or its assets block deletion. An active preview of the
+deleted note closes and cancels its exports; saved buffers for deleted files
+are cleared. The picker refreshes after deletion, preserving the Snacks query.
+If deletion fails partway through, a notification reports what remains.
+
 shape_fills="transparent" clears element backgroundColor values in the render
 input, preserving the editable scene file. It does not alter embedded raster
 images. transparent controls the canvas; false enables the scene's canvas

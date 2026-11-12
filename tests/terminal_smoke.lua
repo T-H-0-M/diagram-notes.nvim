@@ -27,17 +27,18 @@ vim.defer_fn(function()
 	local ok, err = xpcall(function()
 		vim.fn.mkdir(root .. "/.deps", "p")
 		local directory = assert(vim.uv.fs_mkdtemp(root .. "/.deps/terminal-XXXXXX"))
-		local scene, output, note =
-			directory .. "/overview.excalidraw", directory .. "/overview.png", directory .. "/note.md"
+		local assets = directory .. "/note.assets"
+		vim.fn.mkdir(assets, "p")
+		local scene, output, note = assets .. "/overview.excalidraw", assets .. "/overview.png", directory .. "/note.md"
 		vim.fn.writefile(vim.fn.readfile(root .. "/tests/fixtures/overview.excalidraw"), scene)
 		vim.fn.writefile({
 			"# Diagram",
 			"",
 			"Conversation context.",
 			"",
-			"![Diagram](overview.png)",
+			"![Diagram](note.assets/overview.png)",
 			"",
-			"[Source](overview.excalidraw)",
+			"[Source](note.assets/overview.excalidraw)",
 		}, note)
 		plugin.setup({ notes_dir = directory })
 		vim.cmd.enew()
@@ -138,6 +139,63 @@ vim.defer_fn(function()
 		map("q")
 		assert(api.nvim_get_current_buf() == source and api.nvim_win_get_width(code_win) == code_width)
 		pass("Live agent update and source restoration preserve editing state")
+		if vim.env.SNACKS_PATH then
+			vim.cmd.write()
+			local remaining = directory .. "/remaining.md"
+			vim.fn.writefile({ "# Remaining" }, remaining)
+			plugin.toggle()
+			plugin.notes()
+			local snacks = require("snacks")
+			assert(
+				vim.wait(5000, function()
+					return snacks.picker.get()[1] ~= nil
+				end, 20),
+				"Picker did not reopen"
+			)
+			local picker = assert(snacks.picker.get()[1], "Picker did not reopen")
+			picker.input:set("note")
+			picker:find({ refresh = false })
+			assert(
+				vim.wait(5000, function()
+					return snacks.picker.util.path(picker:current()) == note
+				end, 20),
+				"Note was not selected for deletion"
+			)
+			local focused = api.nvim_get_current_win()
+			local binding = api.nvim_win_call(picker.input.win.win, function()
+				assert(vim.tbl_isempty(vim.fn.maparg("d", "i", false, true)), "Deletion overrides search input")
+				return vim.fn.maparg("d", "n", false, true)
+			end)
+			assert(type(binding.callback) == "function", "Missing deletion key")
+			binding.callback()
+			assert(
+				vim.wait(5000, function()
+					return picker:count() == 1 and picker:current() == nil
+				end, 20),
+				"Deleted note stayed in the picker"
+			)
+			assert(not picker.closed and picker.input:get() == "note", "Deletion reset the picker query")
+			assert(api.nvim_get_current_win() == focused, "Deletion took picker focus")
+			assert(not vim.uv.fs_stat(note) and not vim.uv.fs_stat(assets), "Note bundle survived deletion")
+			assert(not api.nvim_buf_is_valid(source), "Deleted note buffer survived")
+			assert(api.nvim_win_get_buf(code_win) == code_buf and api.nvim_win_get_width(code_win) == code_width)
+			picker.input:set("")
+			picker:find({ refresh = false })
+			assert(
+				vim.wait(5000, function()
+					return snacks.picker.util.path(picker:current()) == remaining
+				end, 20),
+				"Remaining note was not selected"
+			)
+			picker:action("confirm")
+			assert(
+				vim.wait(3000, function()
+					return api.nvim_buf_get_name(0) == remaining
+				end, 20),
+				"Picker could not open a note after deletion"
+			)
+			pass("Snacks deletion closes the active preview, removes its bundle, and preserves picker query and focus")
+		end
 	end, debug.traceback)
 	if not ok then
 		results[#results + 1] = "FAIL " .. err

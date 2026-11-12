@@ -13,6 +13,8 @@ local drop_image = image.drop
 
 local passed, failed = 0, 0
 local notify = vim.notify
+local system = vim.system
+local select = vim.ui.select
 local notices = {}
 vim.notify = function(message)
 	notices[#notices + 1] = message
@@ -57,6 +59,9 @@ local function test(name, body)
 	end, debug.traceback)
 	image.drop = drop_image
 	preview.close()
+	vim.system = system
+	vim.ui.select = select
+	require("diagram_notes.config").setup()
 	vim.cmd("silent! tabonly!")
 	vim.cmd("silent! only!")
 	vim.cmd("enew!")
@@ -225,6 +230,73 @@ test("reconfiguring an active preview restores the source and releases its windo
 	equal(ctx.source, vim.api.nvim_get_current_buf())
 	equal(ctx.code_width, vim.api.nvim_win_get_width(ctx.code_win))
 	equal(2, #vim.api.nvim_list_wins())
+end)
+
+test("deleting a previewed note cancels exports and releases its hidden window", function(ctx)
+	local assets = vim.fs.dirname(ctx.file) .. "/diagram.assets"
+	vim.fn.mkdir(assets, "p")
+	vim.fn.writefile({ '{"elements":[]}' }, assets .. "/overview.excalidraw")
+	vim.fn.writefile({ "![Drawing](diagram.assets/overview.png)" }, ctx.file)
+	vim.cmd("edit!")
+	local killed, finish
+	vim.system = function(_, _, callback)
+		finish = callback
+		return {
+			kill = function()
+				killed = true
+			end,
+		}
+	end
+	preview.toggle()
+	vim.api.nvim_set_current_win(ctx.code_win)
+	local deleted = require("diagram_notes.notes").delete(ctx.file)
+	equal(true, deleted)
+	equal(true, killed)
+	equal(false, vim.api.nvim_buf_is_valid(ctx.source))
+	equal(2, #vim.api.nvim_list_wins())
+	equal(ctx.code_win, vim.api.nvim_get_current_win())
+	equal(ctx.code_buf, vim.api.nvim_win_get_buf(ctx.code_win))
+	equal(ctx.code_width, vim.api.nvim_win_get_width(ctx.code_win))
+	finish({ code = 143, stderr = "terminated" })
+	local settled = false
+	vim.schedule(function()
+		settled = true
+	end)
+	assert(vim.wait(1000, function()
+		return settled
+	end))
+	equal(nil, vim.uv.fs_stat(assets))
+	equal({}, notices)
+end)
+
+test("deleting another note keeps the current preview active", function(ctx)
+	local other = vim.fs.dirname(ctx.file) .. "/other.md"
+	vim.fn.writefile({ "# Other" }, other)
+	preview.toggle()
+	local win = vim.api.nvim_get_current_win()
+	local deleted = require("diagram_notes.notes").delete(other)
+	equal(true, deleted)
+	equal(true, vim.api.nvim_win_is_valid(win))
+	equal("vellum://preview", vim.api.nvim_buf_get_name(0))
+	assert(rendered():find("Original explanation.", 1, true))
+end)
+
+test("the fallback picker can open another note after deleting its launching preview", function(ctx)
+	local directory = assert(vim.uv.fs_realpath(vim.fs.dirname(ctx.file)))
+	local other = directory .. "/other.md"
+	vim.fn.writefile({ "# Other" }, other)
+	require("diagram_notes.config").setup({ notes_dir = directory, picker = "select" })
+	local items, choose
+	vim.ui.select = function(list, _, callback)
+		items, choose = list, callback
+	end
+	preview.toggle()
+	require("diagram_notes.notes").open()
+	choose(items[#items])
+	choose(assert(vim.uv.fs_realpath(ctx.file)))
+	choose(other)
+	equal(other, vim.api.nvim_buf_get_name(0))
+	equal(ctx.code_buf, vim.api.nvim_win_get_buf(ctx.code_win))
 end)
 
 vim.notify = notify

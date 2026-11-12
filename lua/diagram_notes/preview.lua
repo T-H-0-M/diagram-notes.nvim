@@ -91,6 +91,12 @@ function M.close()
 	end)
 end
 
+function M.close_for(buf)
+	if active and active.source == buf then
+		M.close()
+	end
+end
+
 function M.refresh(force)
 	local s = active
 	if not s or s.busy or not api.nvim_buf_is_valid(s.source) then
